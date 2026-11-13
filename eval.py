@@ -1,15 +1,11 @@
 """Étape 7 : mesure la qualité de la recherche (sans le LLM)."""
+import json
+from pathlib import Path
+
 from rag import rechercher
 
-TESTS = [
-    ("Suis-je responsable si je cause un dommage à quelqu'un ?", "1240"),
-    ("À partir de quel âge peut-on se marier ?", "144"),
-    ("Qu'est-ce que l'autorité parentale ?", "371-1"),
-    ("Combien de temps ai-je pour agir en justice ?", "2224"),
-    ("Un contrat signé est-il obligatoire ?", "1103"),
-    ("Ai-je droit au respect de ma vie privée ?", "9"),
-    ("Qu'est-ce que le droit de propriété ?", "544"),
-]
+with Path("tests.json").open(encoding="utf-8") as f:
+    TESTS = [(t["question"], t["article"]) for t in json.load(f)]
 
 K_VALEURS = [1, 3, 8]
 
@@ -24,7 +20,7 @@ def main():
         etat = f"rang {rang}" if rang else "absent"
         print(f"art. {attendu} : {etat}  ({question})")
 
-        fork in K_VALEURS:
+        for k in K_VALEURS:
             if rang and rang <= k:
                 trouves[k] += 1
 
