@@ -19,7 +19,11 @@ def main():
     modele = SentenceTransformer(MODELE)
     client = chromadb.PersistentClient(path="chroma")
     collection = client.get_or_create_collection(
-        "lois", metadata={"hnsw:space": "cosine"}
+        "lois", metadata={"hnsw:space": "cosine",
+            "hnsw:construction_ef": 200,
+            "hnsw:search_ef": 200,
+            "hnsw:M": 32,
+        },
     )
 
     for i in range(0, len(articles), LOT):
