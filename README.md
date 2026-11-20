@@ -12,13 +12,14 @@ flowchart LR
     A[XML LEGI<br/>Légifrance] -->|extract.py| B[articles.jsonl<br/>2 897 articles]
     B -->|index.py| C[(ChromaDB<br/>vecteurs)]
     Q[Question] -->|rag.py| C
-    C -->|8 articles<br/>les plus proches| M[Mistral 7B<br/>via Ollama]
+    C -->|20 candidats| X[Reclassement<br/>bge-reranker-v2-m3]
+    X -->|8 meilleurs<br/>articles| M[Mistral 7B<br/>via Ollama]
     M --> R[Réponse<br/>+ sources]
 ```
 
-1. **Extraction** (`extract.py`) : lit les fichiers XML open data de Légifrance (base LEGI) et garde les articles du Code civil en vigueur.
-2. **Indexation** (`index.py`) : transforme chaque article en vecteur avec le modèle `multilingual-e5-base`, puis le range dans ChromaDB.
-3. **Recherche** (`rag.py`) : transforme la question en vecteur et retrouve les 8 articles les plus proches par similarité cosinus.
+1. **Extraction** (`extract.py`) : lit les fichiers XML open data de Légifrance (base LEGI) et garde les articles du Code civil en vigueur, avec les titres des parties du code qui les contiennent (Livre > Titre > Chapitre > Section).
+2. **Indexation** (`index.py`) : transforme chaque article en vecteur avec le modèle `multilingual-e5-base`, puis le range dans ChromaDB. Les deux derniers niveaux de titre sont ajoutés au texte indexé (ex. art. 1875 : « Du prêt à usage, ou commodat »).
+3. **Recherche** (`rag.py`) : transforme la question en vecteur, retrouve les 20 articles les plus proches par similarité cosinus, puis un cross-encoder (`bge-reranker-v2-m3`) relit chaque couple question-article et garde les 8 plus pertinents.
 4. **Génération** (`rag.py`) : Mistral rédige la réponse uniquement à partir de ces articles, en les citant.
 5. **Interface** (`app.py`) : une application web Flask qui affiche la réponse et des liens vers Légifrance.
 
@@ -30,20 +31,25 @@ flowchart LR
 | Parsing XML | lxml |
 | Embeddings | sentence-transformers, `intfloat/multilingual-e5-base` |
 | Base vectorielle | ChromaDB (index HNSW) |
+| Reclassement | cross-encoder `BAAI/bge-reranker-v2-m3` (GPU Apple via MPS si disponible) |
 | LLM | Mistral 7B via Ollama (local) |
 | Web | Flask + HTML/JS |
 
 ## Résultats
 
-Évaluation de la recherche sur 7 questions dont on connaît l'article attendu (`eval.py`), avec la mesure **hit rate@k** : le bon article est-il dans les k premiers résultats ?
+Évaluation de la recherche sur **47 questions** de la vie courante dont on connaît l'article attendu (`tests.json`, `eval.py`), avec la mesure **hit rate@k** : le bon article est-il dans les k premiers résultats ? Le Top-8 compte le plus, car ce sont ces 8 articles que reçoit Mistral.
 
-| Mesure | Avant | Après correction |
-|---|---|---|
-| Top-1 | 43 % | **57 %** |
-| Top-3 | 71 % | **86 %** |
-| Top-8 | 71 % | **86 %** |
+| Version | Top-1 | Top-3 | Top-8 |
+|---|---|---|---|
+| Recherche vectorielle seule | 51 % | 62 % | 72 % |
+| + titres de section dans le texte indexé | 49 % | 68 % | 74 % |
+| + reclassement (`bge-reranker-v2-m3`, 20 candidats) | **55 %** | **74 %** | **81 %** |
 
-**Le bug trouvé grâce à l'évaluation :** l'article 9 (« Chacun a droit au respect de sa vie privée ») n'apparaissait pas dans le top 100, alors que la question reprenait presque ses mots.
+**Ce que l'analyse des échecs a montré :** les articles ratés sont tous bien dans l'index. Le problème est l'**écart de vocabulaire** : la question emploie un mot courant (« prêter sa voiture », « déshériter », « union libre ») et l'article un terme juridique (« prêt à usage », « réserve héréditaire », « concubinage »).
+- Les **titres de section** (« Du prêt à usage », « Du cautionnement ») apportent ce vocabulaire. Ajouter seulement les 2 derniers niveaux, sans « Chapitre II : », donne le meilleur compromis ; les niveaux supérieurs (Livre, Titre), communs à des centaines d'articles, dégradent le classement.
+- Le **reclassement** fait le plus gros du gain. 20 candidats suffisent (même résultat qu'avec 50), pour environ 1,2 s de plus par question sur puce Apple. Un petit cross-encoder (`mmarco-mMiniLMv2`) a été testé et écarté : il dégradait le Top-1 et le Top-3.
+
+**Le bug trouvé grâce à l'évaluation (première version, 7 questions) :** l'article 9 (« Chacun a droit au respect de sa vie privée ») n'apparaissait pas dans le top 100, alors que la question reprenait presque ses mots.
 Diagnostic pas à pas :
 - vecteur stocké correct ;
 - score de l'article (0.855) supérieur à celui du 1er résultat renvoyé (0.827) ;
@@ -54,13 +60,14 @@ Correction : `search_ef` et `construction_ef` à 200, `M` à 32. L'article 9 est
 ## Limites connues
 
 - **Un seul code** : seul le Code civil est indexé. Une question sur le droit de vote (Code électoral) obtient une réponse approximative.
-- **Écart de vocabulaire** : « un contrat signé est-il obligatoire ? » ne retrouve pas l'article 1103 (« les contrats légalement formés tiennent lieu de loi... »).
+- **Écart de vocabulaire, en partie seulement comblé** : 9 questions sur 47 ne retrouvent toujours pas leur article dans le top 8, par exemple « si je prête ma voiture à un ami » (art. 1875, prêt à usage) ou « peut-on déshériter ses enfants » (art. 912, réserve héréditaire).
 - **Petit modèle** : Mistral 7B suit imparfaitement les consignes. Il lui arrive de mal attribuer une citation ou d'oublier l'avertissement.
-- **Évaluation réduite** : 7 questions, ce qui est trop peu pour des chiffres solides.
+- **Évaluation encore modeste** : 47 questions, donc 1 question = environ 2 points de pourcentage. Les écarts de 1 ou 2 questions entre deux versions sont à prendre avec prudence.
+- **Temps de réponse** : le reclassement ajoute environ 1,2 s par question sur puce Apple (environ 2,8 s sur CPU). Il se désactive avec `RECLASSEMENT = False` dans `rag.py`.
 
 ## Pistes d'amélioration
 
-- Élargir l'évaluation à 30-50 questions.
+- Reformuler la question avec le LLM en termes juridiques avant la recherche (pour l'écart de vocabulaire restant).
 - Recherche hybride (vecteurs + BM25 par mots-clés).
 - Comparer Mistral et Claude sur la qualité des citations.
 - Indexer tous les codes.
@@ -83,6 +90,7 @@ Télécharger l'archive `Freemium_legi_global_*.tar.gz` depuis [l'open data DILA
 ```bash
 python extract.py   # crée data/articles.jsonl
 python index.py     # crée la base chroma/ (à lancer avant rag.py)
+                    # au premier lancement, rag.py télécharge le reclasseur (~2,3 Go)
 python eval.py      # mesure la qualité de la recherche
 python app.py       # puis ouvrir http://localhost:5001
 ```
