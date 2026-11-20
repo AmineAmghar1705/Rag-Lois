@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RAG Lois</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --fond:        #0f1115;
+      --surface:     #161a20;
+      --bordure:     #2a303a;
+      --texte:       #e6e1d6;
+      --texte-doux:  #9a978f;
+      --or:          #c2a46d;
+      --or-clair:    #d9c08d;
+      --serif: "Cormorant Garamond", "EB Garamond", Georgia, serif;
+      --sans:  "Inter", system-ui, -apple-system, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html { background: var(--fond); }
+
+    body {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 72px 20px 96px;
+      font-family: var(--sans);
+      font-size: 15px;
+      line-height: 1.7;
+      color: var(--texte);
+      background: var(--fond);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    h1 {
+      font-family: var(--serif);
+      font-weight: 600;
+      font-size: clamp(2rem, 5vw, 2.75rem);
+      line-height: 1.15;
+      letter-spacing: 0.01em;
+      margin: 0 0 12px;
+    }
+    h1::before {
+      content: "§";
+      display: block;
+      font-size: 0.9em;
+      color: var(--or);
+      margin-bottom: 8px;
+    }
+    h1 + p {
+      margin: 0 0 40px;
+      padding-bottom: 28px;
+      border-bottom: 1px solid var(--bordure);
+      font-family: var(--serif);
+      font-style: italic;
+      font-size: 1.1rem;
+      color: var(--texte-doux);
+    }
+
+    textarea {
+      display: block;
+      width: 100%;
+      height: 120px;
+      padding: 16px 18px;
+      font: inherit;
+      color: var(--texte);
+      background: var(--surface);
+      border: 1px solid var(--bordure);
+      border-radius: 2px;
+      resize: vertical;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    textarea::placeholder { color: #5f636b; }
+    textarea:focus {
+      outline: none;
+      border-color: var(--or);
+      box-shadow: 0 0 0 3px rgba(194, 164, 109, .12);
+    }
+
+    button {
+      margin-top: 16px;
+      padding: 12px 28px;
+      font-family: var(--sans);
+      font-size: 0.78rem;
+      font-weight: 500;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--fond);
+      background: var(--or);
+      border: 1px solid var(--or);
+      border-radius: 2px;
+      cursor: pointer;
+      transition: background .2s, color .2s;
+    }
+    button:hover:not(:disabled) { background: transparent; color: var(--or-clair); }
+    button:focus-visible { outline: 2px solid var(--or-clair); outline-offset: 3px; }
+    button:disabled { opacity: .45; cursor: wait; }
+
+    #reponse {
+      white-space: pre-wrap;
+      margin-top: 40px;
+      padding: 28px 32px;
+      font-family: var(--serif);
+      font-size: 1.2rem;
+      line-height: 1.65;
+      background: var(--surface);
+      border: 1px solid var(--bordure);
+      border-left: 2px solid var(--or);
+      border-radius: 2px;
+    }
+    .cache { display: none; }
+
+    #sources {
+      list-style: none;
+      margin: 24px 0 0;
+      padding: 0;
+      counter-reset: src;
+    }
+    #sources:not(:empty)::before {
+      content: "Sources";
+      display: block;
+      margin-bottom: 12px;
+      font-size: 0.72rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--texte-doux);
+    }
+    #sources li {
+      counter-increment: src;
+      display: flex;
+      align-items: baseline;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 12px 0;
+      border-top: 1px solid var(--bordure);
+      font-size: 0.85rem;
+      color: var(--texte-doux);
+      font-variant-numeric: tabular-nums;
+    }
+    #sources li:last-child { border-bottom: 1px solid var(--bordure); }
+    #sources li::before {
+      content: counter(src, upper-roman) ".";
+      min-width: 2.2em;
+      font-family: var(--serif);
+      color: var(--or);
+    }
+    #sources a {
+      font-family: var(--serif);
+      font-size: 1.08rem;
+      color: var(--texte);
+      text-decoration: none;
+      border-bottom: 1px solid transparent;
+      transition: color .2s, border-color .2s;
+    }
+    #sources a:hover { color: var(--or-clair); border-bottom-color: var(--or); }
+
+    @media (max-width: 520px) {
+      body { padding: 48px 16px 64px; }
+      #reponse { padding: 20px; font-size: 1.1rem; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Questions sur le Code civil</h1>
+  <p>Information générale, pas un conseil juridique.</p>
+
+  <textarea id="question" maxlength="2000" placeholder="Ex. : À partir de quel âge peut-on se marier ?"></textarea>
+  <button id="envoyer">Poser la question</button>
+
+  <div id="reponse" class="cache"></div>
+  <ul id="sources"></ul>
+
+  <script>
+    const bouton = document.getElementById("envoyer");
+    const zoneReponse = document.getElementById("reponse");
+    const listeSources = document.getElementById("sources");
+
+    bouton.addEventListener("click", async () => {
+      const question = document.getElementById("question").value;
+      bouton.disabled = true;
+      zoneReponse.classList.remove("cache");
+      zoneReponse.textContent = "Recherche en cours…";
+      listeSources.innerHTML = "";
+
+      try {
+        const res = await fetch("/api/question", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question: question }),
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          zoneReponse.textContent = data.erreur;
+          return;
+        }
+
+        zoneReponse.textContent = data.reponse;
+        for (const s of data.sources) {
+          const li = document.createElement("li");
+          const lien = document.createElement("a");
+          lien.href = s.lien;
+          lien.target = "_blank";
+          lien.textContent = `${s.code}, art. ${s.num}`;
+          li.append(lien, ` (score ${s.score})`);
+          listeSources.append(li);
+        }
+      } catch (e) {
+        zoneReponse.textContent = "Erreur : le serveur ne répond pas.";
+      } finally {
+        bouton.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

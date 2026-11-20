@@ -8,7 +8,7 @@ app = Flask(__name__)
 
 @app.get("/")
 def accueil():
-    return render_template("index.html")
+    return render_template("dtyle.html")
 
 
 @app.post("/api/question")
