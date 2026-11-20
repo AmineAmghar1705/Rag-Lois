@@ -10,6 +10,25 @@ CODES = {"Code civil"}  # mettre set() pour garder tous les codes
 MAX_CHARS = 6000        # coupe les très longs articles
 
 
+def lire_titres(root):
+    """Titres des parties du code qui contiennent l'article (Livre > Titre > Chapitre > Section).
+
+    Ils apportent le vocabulaire juridique absent du texte de l'article
+    (ex. art. 1875 : « Titre X : Du prêt > Chapitre Ier : Du prêt à usage »).
+    Un niveau peut avoir plusieurs versions datées : on garde celle en vigueur.
+    """
+    titres = []
+    tm = root.find(".//CONTEXTE/TEXTE/TM")
+    while tm is not None:
+        versions = tm.findall("TITRE_TM")
+        if versions:
+            actuelles = [v for v in versions if v.get("fin") == "2999-01-01"] or versions
+            titre = max(actuelles, key=lambda v: v.get("debut") or "")
+            titres.append(" ".join((titre.text or "").split()))
+        tm = tm.find("TM")
+    return titres
+
+
 def lire_article(fichier):
     root = etree.parse(str(fichier)).getroot()
 
@@ -25,6 +44,7 @@ def lire_article(fichier):
         "num": champ(".//META_ARTICLE/NUM"),
         "etat": champ(".//META_ARTICLE/ETAT"),
         "date_debut": champ(".//META_ARTICLE/DATE_DEBUT"),
+        "titres": lire_titres(root),
         "texte": texte[:MAX_CHARS],
         "lien": f"https://www.legifrance.gouv.fr/codes/article_lc/{art_id}",
     }
