@@ -48,6 +48,7 @@ flowchart LR
 **Ce que l'analyse des échecs a montré :** les articles ratés sont tous bien dans l'index. Le problème est l'**écart de vocabulaire** : la question emploie un mot courant (« prêter sa voiture », « déshériter », « union libre ») et l'article un terme juridique (« prêt à usage », « réserve héréditaire », « concubinage »).
 - Les **titres de section** (« Du prêt à usage », « Du cautionnement ») apportent ce vocabulaire. Ajouter seulement les 2 derniers niveaux, sans « Chapitre II : », donne le meilleur compromis ; les niveaux supérieurs (Livre, Titre), communs à des centaines d'articles, dégradent le classement.
 - Le **reclassement** fait le plus gros du gain. 20 candidats suffisent (même résultat qu'avec 50), pour environ 1,2 s de plus par question sur puce Apple. Un petit cross-encoder (`mmarco-mMiniLMv2`) a été testé et écarté : il dégradait le Top-1 et le Top-3.
+- La **reformulation de la question par Mistral** (« prêter ma voiture » → terme juridique, avant la recherche) a été testée et écartée : au mieux ±1 question sur 47, pour environ 0,9 s de plus. Mistral 7B ne connaît pas assez le vocabulaire juridique : il paraphrase (« contrat de prêt de voiture » au lieu de « prêt à usage ») ou se trompe (« déshériter » → « légitimation » au lieu de « réserve héréditaire »). Le code reste dans `rag.py` (`REFORMULATION = False`).
 
 **Le bug trouvé grâce à l'évaluation (première version, 7 questions) :** l'article 9 (« Chacun a droit au respect de sa vie privée ») n'apparaissait pas dans le top 100, alors que la question reprenait presque ses mots.
 Diagnostic pas à pas :
@@ -67,7 +68,7 @@ Correction : `search_ef` et `construction_ef` à 200, `M` à 32. L'article 9 est
 
 ## Pistes d'amélioration
 
-- Reformuler la question avec le LLM en termes juridiques avant la recherche (pour l'écart de vocabulaire restant).
+- Reformuler la question en termes juridiques avec un modèle plus fort que Mistral 7B (Claude, ou un modèle local plus gros) : essai fait avec Mistral, sans gain.
 - Recherche hybride (vecteurs + BM25 par mots-clés).
 - Comparer Mistral et Claude sur la qualité des citations.
 - Indexer tous les codes.
