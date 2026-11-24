@@ -1,11 +1,20 @@
 """Étape 5 : cherche les articles les plus proches d'une question, puis répond."""
+import os
+
 import chromadb
-import ollama
+import requests
 import torch
 from sentence_transformers import CrossEncoder, SentenceTransformer
 
 MODELE = "intfloat/multilingual-e5-base"
-LLM = "mistral"
+
+# Génération : en local, Mistral 7B via Ollama ; en ligne (Google Cloud Run,
+# sans GPU), l'API de Mistral, beaucoup plus rapide que Mistral 7B sur CPU.
+# GENERATION=mistral est défini dans le Dockerfile, MISTRAL_API_KEY vient de Secret Manager.
+GENERATION = os.environ.get("GENERATION", "ollama")
+LLM = "mistral"  # modèle Ollama
+MISTRAL_MODELE = os.environ.get("MISTRAL_MODELE", "mistral-small-latest")
+MISTRAL_URL = "https://api.mistral.ai/v1/chat/completions"
 
 # Reclassement : la recherche vectorielle propose CANDIDATS articles, puis un
 # cross-encoder relit chaque couple (question, article) et les reclasse.
@@ -51,17 +60,37 @@ if RECLASSEMENT:
     reclasseur = CrossEncoder(RECLASSEUR, max_length=512, device=appareil)
 
 
+def discuter(messages, temperature=None):
+    """Envoie les messages au LLM (Ollama en local, API Mistral en ligne) et renvoie sa réponse."""
+    if GENERATION == "mistral":
+        corps = {"model": MISTRAL_MODELE, "messages": messages}
+        if temperature is not None:
+            corps["temperature"] = temperature
+        reponse = requests.post(
+            MISTRAL_URL,
+            headers={"Authorization": f"Bearer {os.environ['MISTRAL_API_KEY']}"},
+            json=corps,
+            timeout=60,
+        )
+        reponse.raise_for_status()
+        return reponse.json()["choices"][0]["message"]["content"]
+
+    import ollama  # seulement en local
+
+    options = {"temperature": temperature} if temperature is not None else None
+    return ollama.chat(model=LLM, messages=messages, options=options)["message"]["content"]
+
+
 def reformuler(question):
-    """Demande à Mistral la question dans le vocabulaire du Code civil."""
-    reponse = ollama.chat(
-        model=LLM,
-        messages=[
+    """Demande au LLM la question dans le vocabulaire du Code civil."""
+    texte = discuter(
+        [
             {"role": "system", "content": CONSIGNES_REFORMULATION},
             {"role": "user", "content": f"Question : {question}\nReformulation :"},
         ],
-        options={"temperature": 0},  # même question -> même reformulation
+        temperature=0,  # même question -> même reformulation
     )
-    return reponse["message"]["content"].strip().split("\n")[0]
+    return texte.strip().split("\n")[0]
 
 
 def chercher_vecteurs(requetes, n):
@@ -107,14 +136,11 @@ def repondre(question, k=8):
     articles = rechercher(question, k)
     contexte = "\n\n".join(f"[{a['code']}, art. {a['num']}]\n{a['texte']}" for a in articles)
 
-    reponse = ollama.chat(
-        model=LLM,
-        messages=[
-            {"role": "system", "content": CONSIGNES},
-            {"role": "user", "content": f"Articles :\n{contexte}\n\nQuestion : {question}"},
-        ],
-    )
-    return reponse["message"]["content"], articles
+    texte = discuter([
+        {"role": "system", "content": CONSIGNES},
+        {"role": "user", "content": f"Articles :\n{contexte}\n\nQuestion : {question}"},
+    ])
+    return texte, articles
 
 
 if __name__ == "__main__":

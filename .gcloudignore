@@ -1,0 +1,12 @@
+# Fichiers envoyés à Google Cloud Build pour construire l'image.
+# Liste blanche : on exclut tout, puis on réautorise le strict nécessaire
+# (surtout pas data/, 33 Go de XML, ni .venv/ ni .env).
+/*
+!Dockerfile
+!app.py
+!rag.py
+!templates/
+!chroma/
+!deploy/
+deploy/*
+!deploy/requirements.txt
