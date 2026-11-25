@@ -4,4 +4,5 @@ flask>=3.0
 chromadb>=0.5
 sentence-transformers>=3.0
 lxml>=5.0
-ollama>=0.4gunicorn>=23
+ollama>=0.4
+gunicorn>=23
