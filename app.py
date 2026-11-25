@@ -16,8 +16,14 @@ historique = defaultdict(deque)
 
 
 def trop_de_questions():
-    # derrière le proxy de Cloud Run, la vraie IP est dans X-Forwarded-For
-    ip = (request.headers.get("X-Forwarded-For") or request.remote_addr or "").split(",")[0].strip()
+    # derrière un tunnel Cloudflare, la vraie IP est dans CF-Connecting-IP ;
+    # derrière le proxy de Cloud Run, dans X-Forwarded-For
+    ip = (
+        request.headers.get("CF-Connecting-IP")
+        or request.headers.get("X-Forwarded-For")
+        or request.remote_addr
+        or ""
+    ).split(",")[0].strip()
     maintenant = time.monotonic()
     appels = historique[ip]
     while appels and maintenant - appels[0] > FENETRE_SECONDES:

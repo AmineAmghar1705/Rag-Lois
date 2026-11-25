@@ -96,6 +96,19 @@ python eval.py      # mesure la qualité de la recherche
 python app.py       # puis ouvrir http://localhost:5001
 ```
 
+## Mise en ligne
+
+**Depuis ce Mac, gratuit** (qualité complète : Ollama + reclassement) :
+
+```bash
+brew install cloudflared   # une seule fois
+deploy/tunnel.sh           # affiche une adresse publique https://….trycloudflare.com
+```
+
+Le site reste accessible tant que le script tourne et que le Mac est allumé ; l'adresse change à chaque lancement. Les visiteurs sont limités à 10 questions par minute.
+
+**Sur Google Cloud Run** (permanent, facturation Google requise) : génération par l'API Mistral, voir `deploy/cloudrun.sh`.
+
 ## Données
 
 Textes issus de la base LEGI (DILA / Légifrance), publiés sous Licence Ouverte Etalab.
