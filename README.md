@@ -5,6 +5,11 @@ Projet de RAG (Retrieval-Augmented Generation) construit de A à Z, entièrement
 
 > ⚠️ Information générale, pas un conseil juridique.
 
+**Démo en ligne : [macbook-air-de-amine.tail77804b.ts.net](https://macbook-air-de-amine.tail77804b.ts.net)**
+(hébergée sur mon Mac : disponible seulement quand il est allumé, voir [Mise en ligne](#mise-en-ligne))
+
+![Page d'accueil de l'application](docs/capture.jpeg)
+
 ## Comment ça marche
 
 ```mermaid
