@@ -16,14 +16,9 @@ historique = defaultdict(deque)
 
 
 def trop_de_questions():
-    # derrière un proxy (Tailscale Funnel, Cloud Run, Cloudflare), la vraie IP
-    # est dans un en-tête ; sinon c'est l'adresse de la connexion
-    ip = (
-        request.headers.get("CF-Connecting-IP")
-        or request.headers.get("X-Forwarded-For")
-        or request.remote_addr
-        or ""
-    ).split(",")[0].strip()
+    # derrière un proxy (Tailscale Funnel, Cloud Run), la vraie IP est dans
+    # X-Forwarded-For ; sinon c'est l'adresse de la connexion
+    ip = (request.headers.get("X-Forwarded-For") or request.remote_addr or "").split(",")[0].strip()
     maintenant = time.monotonic()
     appels = historique[ip]
     while appels and maintenant - appels[0] > FENETRE_SECONDES:
