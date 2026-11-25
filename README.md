@@ -101,11 +101,10 @@ python app.py       # puis ouvrir http://localhost:5001
 **Depuis ce Mac, gratuit** (qualité complète : Ollama + reclassement) :
 
 ```bash
-brew install cloudflared   # une seule fois
-deploy/tunnel.sh           # affiche une adresse publique https://….trycloudflare.com
+deploy/tunnel.sh   # affiche l'adresse publique https://<nom-du-mac>.<tailnet>.ts.net
 ```
 
-Le site reste accessible tant que le script tourne et que le Mac est allumé ; l'adresse change à chaque lancement. Les visiteurs sont limités à 10 questions par minute.
+Passe par [Tailscale Funnel](https://tailscale.com/kb/1223/funnel) (gratuit) : l'adresse est fixe, mais le site n'est accessible que tant que le script tourne et que le Mac est allumé. Prérequis : application Tailscale connectée, HTTPS et Funnel activés dans la console Tailscale. Les visiteurs sont limités à 10 questions par minute.
 
 **Sur Google Cloud Run** (permanent, facturation Google requise) : génération par l'API Mistral, voir `deploy/cloudrun.sh`.
 

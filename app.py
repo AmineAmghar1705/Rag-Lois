@@ -16,8 +16,8 @@ historique = defaultdict(deque)
 
 
 def trop_de_questions():
-    # derrière un tunnel Cloudflare, la vraie IP est dans CF-Connecting-IP ;
-    # derrière le proxy de Cloud Run, dans X-Forwarded-For
+    # derrière un proxy (Tailscale Funnel, Cloud Run, Cloudflare), la vraie IP
+    # est dans un en-tête ; sinon c'est l'adresse de la connexion
     ip = (
         request.headers.get("CF-Connecting-IP")
         or request.headers.get("X-Forwarded-For")
